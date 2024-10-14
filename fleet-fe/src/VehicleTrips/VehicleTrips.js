@@ -1,87 +1,92 @@
 import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import {
   getTrips,
-  getVehicles,
-  getRoutes,
+  getOrganizations,
+  getDriverVehicleAssignments,
 } from "../api";
+import "bootstrap/dist/css/bootstrap.min.css";
+
+const PER_KM_RATE = 10;
 
 function VehicleTrips() {
-  const [trips, setTrips] = useState([]);
-  const [vehicles, setVehicles] = useState([]);
-  const [routes, setRoutes] = useState([]);
-  const [vehicleKilometers, setVehicleKilometers] = useState({}); 
+  const [tripDetails, setTripDetails] = useState([]);
 
   useEffect(() => {
-    Promise.all([getTrips(), getVehicles(), getRoutes()])
-      .then(([tripsRes, vehiclesRes, routesRes]) => {
-        setTrips(tripsRes.data);
-        setVehicles(vehiclesRes.data);
-        setRoutes(routesRes.data);
+    const fetchData = async () => {
+      try {
+        const tripsRes = await getTrips();
+        const driverVehicleRes = await getDriverVehicleAssignments();
+        const organizationsRes = await getOrganizations();
 
-        const kilometers = computeKilometers(tripsRes.data, routesRes.data);
-        setVehicleKilometers(kilometers);
-      })
-      .catch((err) => console.error(err));
+        const details = computeTripDetails(
+          tripsRes.data,
+          driverVehicleRes.data,
+          organizationsRes.data
+        );
+        setTripDetails(details);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    fetchData();
   }, []);
 
-  const computeKilometers = (trips, routes) => {
-    const routeMap = {}; 
-    routes.forEach((route) => {
-      routeMap[route.id] = route.route_length;
-    });
-
-    const kilometersMap = {}; 
-    trips.forEach((trip) => {
-      if (trip.is_complete) {
-        const vehicleId = trip.vehicle_id._id;
-        const routeLength = routeMap[trip.route_id._id] || 0;
-        kilometersMap[vehicleId] = (kilometersMap[vehicleId] || 0) + routeLength;
-      }
-    });
-
-    return kilometersMap;
+  const computeTripDetails = (trips, driverVehicleData, organizations) => {
+    return trips
+      .filter((trip) => trip.is_complete)
+      .map((trip) => {
+        const vehicle = trip.vehicle_id;
+        const org = organizations.find(
+          (o) => o._id === vehicle.organization_id
+        );
+        const driverAssignment = driverVehicleData.find(
+          (d) => d.vehicle_id.plate_number === vehicle.plate_number
+        );
+        return {
+          orgName: org ? org.name : "Unknown Org",
+          driverName: driverAssignment
+            ? driverAssignment.driver_id.name
+            : "No Driver Assigned",
+          plateNumber: vehicle.plate_number,
+          amount: trip.route_id.route_length * PER_KM_RATE,
+        };
+      });
   };
 
   return (
-    <section>
-      <h2>Vehicle Maintenance & Kilometers</h2>
-      <table border="1">
-        <thead>
-          <tr>
-            <th>Vehicle ID</th>
-            <th>Plate Number</th>
-            <th>Total Kilometers Driven</th>
-            <th>Last Maintenance Date</th>
-            <th>Maintenance Reminder</th>
-          </tr>
-        </thead>
-        <tbody>
-          {vehicles.map((vehicle) => {
-            const totalKm = vehicleKilometers[vehicle._id] || 0;
-            const lastMaintenanceDate = vehicle.last_maintenance
-              ? new Date(vehicle.last_maintenance).toLocaleDateString("en-US", {
-                  year: "numeric",
-                  month: "long",
-                  day: "2-digit",
-                })
-              : "No Maintenance Recorded";
-
-            const maintenanceReminder =
-              totalKm >= 10000 ? "Maintenance Due" : "Up-to-date";
-
-            return (
-              <tr key={vehicle._id}>
-                <td>{vehicle._id}</td>
-                <td>{vehicle.plate_number}</td>
-                <td>{totalKm} km</td>
-                <td>{lastMaintenanceDate}</td>
-                <td>{maintenanceReminder}</td>
+    <div className="container mt-4">
+      <h1 className="mb-4">Vehicle Trips</h1>
+      <Link to="/" className="btn btn-secondary mb-3">
+        Return to Dashboard
+      </Link>
+      <section>
+        <h2 className="mb-3">Completed Trips Report</h2>
+        <div className="table-responsive">
+          <table className="table table-bordered table-hover">
+            <thead className="table-light">
+              <tr>
+                <th>Organization</th>
+                <th>Driver</th>
+                <th>Vehicle Plate</th>
+                <th>Amount (PHP)</th>
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </section>
+            </thead>
+            <tbody>
+              {tripDetails.map((detail, index) => (
+                <tr key={index}>
+                  <td>{detail.orgName}</td>
+                  <td>{detail.driverName}</td>
+                  <td>{detail.plateNumber}</td>
+                  <td>{detail.amount}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
   );
 }
 

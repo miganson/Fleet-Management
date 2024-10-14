@@ -4,6 +4,8 @@ import Dashboard from "./Dashboard/Dashboard";
 import VehicleTrips from "./VehicleTrips/VehicleTrips";
 import Maintenance from "./Maintenance/Maintenance";
 import Report from "./Report/Report";
+import 'bootstrap/dist/css/bootstrap.min.css';
+
 
 function App() {
   return (

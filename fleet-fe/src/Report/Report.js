@@ -1,48 +1,93 @@
 import React, { useEffect, useState } from "react";
-import { getOrganizations, getTrips } from "../api";
+import { Link } from "react-router-dom"; 
+import {
+  getTrips,
+  getOrganizations,
+  getDriverVehicleAssignments,
+} from "../api";
+import "bootstrap/dist/css/bootstrap.min.css";
 
-function MonthlyReport() {
-  const [organizations, setOrganizations] = useState([]);
-  const [trips, setTrips] = useState([]);
-  const PER_KM_RATE = 5; 
+const PER_KM_RATE = 10;
+
+function Report() {
+  const [tripDetails, setTripDetails] = useState([]);
+  const [organizationTotals, setOrganizationTotals] = useState({});
 
   useEffect(() => {
-    getOrganizations().then((res) => setOrganizations(res.data));
-    getTrips().then((res) => setTrips(res.data));
+    const fetchData = async () => {
+      try {
+        const tripsRes = await getTrips();
+        const driverVehicleRes = await getDriverVehicleAssignments();
+        const organizationsRes = await getOrganizations();
+
+        const details = computeTripDetails(
+          tripsRes.data,
+          driverVehicleRes.data,
+          organizationsRes.data
+        );
+        setTripDetails(details);
+        setOrganizationTotals(computeOrganizationTotals(details));
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    fetchData();
   }, []);
 
-  const computePayment = (organizationId) => {
-    const orgTrips = trips.filter(
-      (trip) => trip.vehicle_id.organization_id === organizationId && trip.is_complete
-    );
+  const computeTripDetails = (trips, driverVehicleData, organizations) => {
+    return trips
+      .filter((trip) => trip.is_complete)
+      .map((trip) => {
+        const vehicle = trip.vehicle_id;
+        const org = organizations.find(
+          (o) => o._id === vehicle.organization_id
+        );
+        return {
+          orgName: org ? org.name : "Unknown Org",
+          amount: trip.route_id.route_length * PER_KM_RATE,
+        };
+      });
+  };
 
-    return orgTrips.reduce(
-      (total, trip) => total + trip.route_id.route_length * PER_KM_RATE,
-      0
-    );
+  const computeOrganizationTotals = (tripDetails) => {
+    return tripDetails.reduce((totals, { orgName, amount }) => {
+      totals[orgName] = (totals[orgName] || 0) + amount;
+      return totals;
+    }, {});
   };
 
   return (
-    <div>
-      <h1>Monthly Report</h1>
-      <table>
-        <thead>
-          <tr>
-            <th>Organization</th>
-            <th>Total Payment</th>
-          </tr>
-        </thead>
-        <tbody>
-          {organizations.map((org) => (
-            <tr key={org._id}>
-              <td>{org.name}</td>
-              <td>₱{computePayment(org._id).toFixed(2)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="container mt-4">
+      <h1 className="mb-4">Report</h1>
+      <Link to="/" className="btn btn-secondary mb-3">
+        Return to Dashboard
+      </Link>
+      <section>
+        <h2 className="mb-3">Total Amount Owed by Organization</h2>
+        <div className="table-responsive">
+          <table className="table table-bordered table-hover">
+            <thead className="table-light">
+              <tr>
+                <th>Organization</th>
+                <th>Total Amount Owed (PHP)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(organizationTotals).map(
+                ([orgName, totalAmount], index) => (
+                  <tr key={index}>
+                    <td>{orgName}</td>
+                    <td>{totalAmount}</td>
+                  </tr>
+                )
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </div>
   );
 }
 
-export default MonthlyReport;
+export default Report;
