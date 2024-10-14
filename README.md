@@ -7,6 +7,8 @@
    a. **If it does, are there any improvements that can be made to the schema?**
    
       - **Add a Rate Table:** Currently, I am hard coding the `PER_KM_RATE`. Instead of hard-coding `PER_KM_RATE` it would be better if a new table to store it is implemented. This allows for flexibility if rates change over time.
+      - **Add a Maintenance Status:** Currently, I am hard coding the maintenance status. Instead of hard-coding it would be better if it could be added to Driver Vehicle or een if a new table could be added for it.
+
       
    c. **Are there any features you expect would be omitted for an MVP deployment, but consider important for long-term usage?**
    
